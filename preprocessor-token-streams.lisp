@@ -7,6 +7,7 @@
 ;; I require rather fine-grained control over iterator state -- simple co-routine wouldn't do (I guess)
 
 (defgeneric next-val (iterator))
+(defgeneric peek-val (iterator))
 
 (defclass raw-char-iterator ()
   ((line-num :initform 0)
@@ -29,6 +30,14 @@
   (pos-in-line (slot-value iter 'sub-iter)))
 (defmethod file-name ((iter feeding-iterator))
   (file-name (slot-value iter 'sub-iter)))
+
+(defmethod peek-val ((iter feeding-iterator))
+  (with-slots (sub-iter) iter
+    (peek-val sub-iter)))
+
+(defmethod peek-val ((iter raw-char-iterator))
+  (with-slots (stream) iter
+    (peek-char nil stream nil)))
 
 (defun mk-raw-char-iter (fname-or-stream)
   (if (typep fname-or-stream 'stream)
@@ -61,6 +70,29 @@
 
 (defun mk-trigraph-resolved-iterator (sub-iter)
   (make-instance 'trigraph-resolved-iterator :sub-iter sub-iter))
+
+(defmethod next-val ((iter trigraph-resolved-iterator))
+  ;; TODO : actually resolve trigraphs -- for now this layer does nothing
+  (with-slots (sub-iter) iter
+    (next-val sub-iter)))
+
+(defclass escaped-newlines-resolved-iterator (feeding-iterator)
+  ((stashed-char :initform nil)))
+
+(defun mk-escaped-newlines-resolved-iterator (sub-iter)
+  (make-instance 'escaped-newlines-resolved-iterator :sub-iter sub-iter))
+
+(defmethod next-val ((iter escaped-newlines-resolved-iterator))
+  (with-slots (sub-iter) iter
+    (let ((char (next-val sub-iter)))
+      (if (char= #\\ char)
+	  (let ((it (peek-val sub-iter)))
+	    (if (and it (char= #\newline it))
+		(progn (next-val sub-iter) ; we clear this newline
+		       (next-val iter)) ; we recurse onto the next line
+		char))
+	  char))))
+
 
 ;; (let ((trigraph-map '((#\= . #\#) (#\( . #\[) (#\/ . #\\) (#\) . #\]) (#\' . #\^)
 ;; 		      (#\< . #\{) (#\! . #\|) (#\> . #\}) (#\- . #\~))))
