@@ -36,26 +36,49 @@
       (with-open-file (stream fname-or-stream)
 	(make-instance 'raw-char-iterator :stream stream :fname fname-or-stream))))
 
+(defun read-char! (stream)
+  (handler-case (read-char stream)
+    (end-of-file () (error 'stop-iteration))))
+
 (defmethod next-val ((iter raw-char-iterator))
   (with-slots (line-num pos-in-line stream) iter
-    (let ((char (read-char stream)))
+    (let ((char (read-char! stream)))
       (cond ((char= #\newline char) (progn (incf line-num)
 					   (setf pos-in-line 0)
 					   #\newline))
 	    ;; #\return #\newline counts as one linebreak
 	    ((char= #\return char) (let ((next-char (peek-char nil stream nil)))
 				     (if (equal #\newline next-char)
-					 (read-char stream)))
+					 (read-char! stream)))
 	     (progn (incf line-num)
 		    (setf pos-in-line 0)
 		    #\newline))
 	    (t (incf pos-in-line)
 	       char)))))
 	     
-(defclass trigraph-resolved-iterator (feeding-iterator) ())
+(defclass trigraph-resolved-iterator (feeding-iterator)
+  ((stashed-char :initform nil)))
 
 (defun mk-trigraph-resolved-iterator (sub-iter)
   (make-instance 'trigraph-resolved-iterator :sub-iter sub-iter))
 
-
+;; (let ((trigraph-map '((#\= . #\#) (#\( . #\[) (#\/ . #\\) (#\) . #\]) (#\' . #\^)
+;; 		      (#\< . #\{) (#\! . #\|) (#\> . #\}) (#\- . #\~))))
+;;   (defmethod next-val ((iter trigraph-resolved-iterator))
+;;     (with-slots (sub-iter stashed-char) iter
+;;       (let ((char (or stashed-char
+;; 		      (next-val sub-iter))))
+;; 	(if (not (char= #\? char))
+;; 	    (progn (setf stashed-char nil)
+;; 		   char)
+;; 	    (progn (let ((next-char (setf stashed-char (handler-case (next-val sub-iter)
+;; 							 (stop-iteration () nil)))))
+;; 		     (if (not (and next-char (char= #\? char)))
+;; 			 #\? ; next char is correctly stashed for the next call
+;; 			 (let ((next-next-char (handler-case (next-val sub-iter)
+;; 						 (stop-iteration () nil))))
+;; 			   (let ((it (and next-next-char (cdr (assoc next-next-char trigraph-map
+;; 								     :test #'char=)))))
+;; 			     (if (not it)
+				 
 
