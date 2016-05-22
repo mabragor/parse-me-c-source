@@ -205,3 +205,46 @@
   (apply #'dehexify-char (postimes hexadecimal-digit)))
 
 
+(define-preprocessor-rule string-literal ()
+  (let* ((prefix (? (most-full-parse "u8" "u" "U" "L")))
+	 (body (progm #\" (? s-char-sequence) #\")))
+    (list :string-literal prefix body)))
+
+(define-preprocessor-rule s-char-sequence ()
+  (postimes s-char))
+
+(define-preprocessor-rule s-char ()
+  (|| escape-sequence
+      (!! (|| #\" #\\ #\newline))))
+
+(define-preprocessor-rule header-name ()
+  (|| (progm #\< h-char-sequence #\>)
+      (progm #\" q-char-sequence #\")))
+
+(define-preprocessor-rule h-char-sequence ()
+  (postimes h-char))
+
+(define-preprocessor-rule h-char ()
+  (!! (|| #\newline #\>)))
+
+(define-preprocessor-rule q-char-sequence ()
+  (postimes q-char))
+
+(define-preprocessor-rule q-char ()
+  (!! (|| #\newline #\")))
+
+(define-preprocessor-rule sign ()
+  (|| #\- #\+))
+
+(define-preprocessor-rule pp-number ()
+  (let* ((first (|| digit
+		    (list (v #\.) (v digit))))
+	 (rest (times (|| digit
+			  identifier-nondigit
+			  #\.
+			  (list (v #\e) (v sign))
+			  (list (v #\E) (v sign))
+			  (list (v #\p) (v sign))
+			  (list (v #\P) (v sign))))))
+    (list :pp-number (cons first rest))))
+	   
