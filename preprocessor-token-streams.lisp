@@ -248,3 +248,16 @@
 			  (list (v #\P) (v sign))))))
     (list :pp-number (cons first rest))))
 	   
+(define-preprocessor-rule comment ()
+  (|| one-line-comment
+      multi-line-comment))
+
+;; TODO : sometimes, I need to also count the number of lines in the comment
+(define-preprocessor-rule one-line-comment ()
+  (v "//")
+  (times (!! #\newline)))
+
+(define-preprocessor-rule multi-line-comment ()
+  (v "/*")
+  (times (!! "*/"))
+  (v "*/"))
