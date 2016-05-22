@@ -5,8 +5,9 @@
   :author "Alexandr Popolitov <popolit@gmail.com>"
   :license "MIT"
   :serial t
-  :depends-on (#:iterate #:cl-itertools #:defmacro-enhance)
+  :depends-on (#:iterate #:cl-itertools #:defmacro-enhance #:esrap-liquid)
   :components ((:file "package")
+	       (:file "preprocessor-macros")
 	       (:file "preprocessor-token-streams")
                (:file "parse-me-c-source")))
 

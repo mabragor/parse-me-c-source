@@ -114,3 +114,18 @@
 ;; 			     (if (not it)
 				 
 
+;;; Now we will use ESRAP-LIQUID to quickly hack tokenizer for a preprocessor
+;;; The peculiarity is that I need to leave token-iter every time in consistent state
+;;; (and also do something with the cache -- probably, forget it smartly)
+;;; This iterator would feed on chars -- so, standard ESRAP-LIQUID should suffice.
+
+(define-preprocessor-rule preprocessing-token ()
+  (|| header-name
+      identifier
+      pp-number
+      character-constant
+      string-literal
+      punctuator
+      ;; this is really the fallback option -- should be the last one
+      nw-char))
+
