@@ -129,3 +129,79 @@
       ;; this is really the fallback option -- should be the last one
       nw-char))
 
+(define-preprocessor-rule punctuator ()
+  (list :punctuator (text (most-full-parse "[" "]" "(" ")" "{" "}" "." "->"
+					   "++" "--" "&" "*" "+" "-" "~" "!"
+					   "/" "%" "<<" ">>" "<" ">" "<=" ">=" "==" "!=" "^" "|" "&&" "||"
+					   "?" ":" ";" "..."
+					   "=" "*=" "/=" "%=" "+=" "-=" "<<=" ">>=" "&=" "^=" "|="
+					   "," "#" "##"
+					   "<:" ":>" "<%" "%>" "%:" "%:%:"))))
+
+(define-preprocessor-rule identifier ()
+  (list :identifier (text (cons (v identifier-nondigit)
+				(times (|| identifier-nondigit digit))))))
+
+(define-preprocessor-rule implementation-defined-char ()
+  (fail-parse "No other chars are defined by the implementation"))
+
+(define-preprocessor-rule identifier-nondigit ()
+  (|| nondigit
+      universal-character-name
+      implementation-defined-char))
+
+(define-preprocessor-rule universal-character-name ()
+  (|| (progn (v "\\u") (dehexify-char (v hex-quad)))
+      (progn (v "\\U") (dehexify-char (v hex-quad) (v hex-quad)))))
+
+(define-preprocessor-rule hex-quad ()
+  (times hexadecimal-digit :exactly 4))
+
+(define-preprocessor-rule nondigit ()
+  (|| #\_
+      (character-ranges (#\a #\z) (#\A #\Z))))
+
+(define-preprocessor-rule digit ()
+  (character-ranges (#\0 #\9)))
+
+(define-preprocessor-rule hexadecimal-digit ()
+  (character-ranges (#\0 #\9) (#\a #\f) (#\A #\F)))
+
+(define-preprocessor-rule character-constant ()
+  (let* ((prefix (? (|| #\L #\u #\U)))
+	 (body (progm #\' c-char-sequence #\')))
+    (list :char-const prefix body)))
+    
+(define-preprocessor-rule c-char-sequence ()
+  (postimes c-char))
+
+(define-preprocessor-rule c-char ()
+  (|| escape-sequence
+      (!! (|| #\' #\\ #\newline))))
+
+(define-preprocessor-rule escape-sequence ()
+  (|| simple-escape-sequence
+      octal-escape-sequence
+      hexadecimal-escape-sequence
+      universal-character-name))
+
+(define-preprocessor-rule simple-escape-sequence ()
+  (v #\\)
+  (|| #\' #\" #\? #\\
+      (progn (v "a") #\bel)
+      (progn (v "b") #\backspace)
+      (progn (v "f") #\page)
+      (progn (v "n") #\newline)
+      (progn (v "r") #\return)
+      (progn (v "t") #\tab)
+      (progn (v "v") #\vt)))
+
+(define-preprocessor-rule octal-escape-sequence ()
+  (v #\\)
+  (apply #'deoctify-char (times octal-digit :from 1 :upto 3)))
+
+(define-preprocessor-rule hexadecimal-escape-sequence ()
+  (v "\\x")
+  (apply #'dehexify-char (postimes hexadecimal-digit)))
+
+
