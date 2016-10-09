@@ -30,3 +30,12 @@
   (is (equal '(:integer-constant 9 (nil :long-long)) (preprocessor-parse 'integer-constant "011ll")))
   (is (equal '(:integer-constant 65535 (:unsigned :long)) (preprocessor-parse 'integer-constant "0xFFFFul")))
   )
+
+(test floating-constant
+  (is (equal '(:floating-constant (("1" "23") nil) :double) (preprocessor-parse 'floating-constant "1.23")))
+  (is (equal '(:floating-constant (("1" "230") nil) :double) (preprocessor-parse 'floating-constant "1.230")))
+  (is (equal '(:floating-constant (("123") (#\- "2")) :double) (preprocessor-parse 'floating-constant "123e-2")))
+  (is (equal '(:floating-constant (("123") (#\- "02")) :double) (preprocessor-parse 'floating-constant "123e-02")))
+  (is (equal '(:floating-constant (("1" "23") nil) :long-double) (preprocessor-parse 'floating-constant "1.23L")))
+  )
+	     

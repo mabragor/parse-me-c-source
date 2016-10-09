@@ -349,3 +349,43 @@
 		   (swap-order (list-v long-long-suffix (? unsigned-suffix)))))
 
 
+(define-preprocessor-rule floating-constant ()
+  (list :floating-constant (most-full-parse decimal-floating-constant
+					    hexadecimal-floating-constant)
+	(or (? floating-suffix)
+	    :double)))
+
+(define-preprocessor-rule floating-suffix ()
+  (|| (progn (|| #\l #\L) :long-double)
+      (progn (|| #\f #\F) :float)))
+
+(define-preprocessor-rule hexadecimal-digit-sequence ()
+  (text (postimes hexadecimal-digit)))
+
+(define-preprocessor-rule digit-sequence ()
+  (text (postimes digit)))
+
+(define-preprocessor-rule exponent-part ()
+  (|| #\e #\E)
+  (list-v (? sign) digit-sequence))
+
+(define-preprocessor-rule binary-exponent-part ()
+  (|| #\p #\P)
+  (list-v (? sign) digit-sequence))
+
+(define-preprocessor-rule hexadecimal-fractional-constant ()
+  (|| (list (? hexadecimal-digit-sequence) (progn-v #\. hexadecimal-digit-sequence))
+      (list-v hexadecimal-digit-sequence) (progn-v #\. nil)))
+
+(define-preprocessor-rule fractional-constant ()
+  (|| (list (? digit-sequence) (progn-v #\. digit-sequence))
+      (list-v digit-sequence) (progn-v #\. nil)))
+
+(define-preprocessor-rule decimal-floating-constant ()
+  (|| (list-v fractional-constant (? exponent-part))
+      (list-v digit-sequence exponent-part)))
+
+(define-preprocessor-rule hexadecimal-floating-constant ()
+  (v hexadecimal-prefix)
+  (|| (list-v hexadecimal-fractional-constant binary-exponent-part)
+      (list-v hexadecimal-digit-sequence binary-exponent-part)))
