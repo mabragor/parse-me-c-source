@@ -52,3 +52,8 @@
   (is (equal `(:string-literal nil ,(format nil "~a" (code-char #x12)))
 	     (preprocessor-parse 'string-literal "\"\\x12\"")))
   )
+
+(test punctuator
+  (is (equal '(:punctuator "[") (preprocessor-parse 'punctuator "[")))
+  (is (equal '(:punctuator "[") (preprocessor-parse 'punctuator "<:")))
+  )

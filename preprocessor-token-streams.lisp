@@ -129,14 +129,22 @@
       ;; this is really the fallback option -- should be the last one
       nw-char))
 
+(defparameter *punctuator-coercion*
+  '(("<:" . "[") (":>" . "]") ("<%" . "{") ("%>" . "}") ("%:" . "#") ("%:%:" . "##")))
+
+(defun coerce-punctuator (thing)
+  (or (cdr (assoc thing *punctuator-coercion* :test #'string=))
+      thing))
+
 (define-preprocessor-rule punctuator ()
-  (list :punctuator (text (most-full-parse "[" "]" "(" ")" "{" "}" "." "->"
-					   "++" "--" "&" "*" "+" "-" "~" "!"
-					   "/" "%" "<<" ">>" "<" ">" "<=" ">=" "==" "!=" "^" "|" "&&" "||"
-					   "?" ":" ";" "..."
-					   "=" "*=" "/=" "%=" "+=" "-=" "<<=" ">>=" "&=" "^=" "|="
-					   "," "#" "##"
-					   "<:" ":>" "<%" "%>" "%:" "%:%:"))))
+  (list :punctuator
+	(coerce-punctuator (text (most-full-parse "[" "]" "(" ")" "{" "}" "." "->"
+						  "++" "--" "&" "*" "+" "-" "~" "!"
+						  "/" "%" "<<" ">>" "<" ">" "<=" ">=" "==" "!=" "^" "|" "&&" "||"
+						  "?" ":" ";" "..."
+						  "=" "*=" "/=" "%=" "+=" "-=" "<<=" ">>=" "&=" "^=" "|="
+						  "," "#" "##"
+						  "<:" ":>" "<%" "%>" "%:" "%:%:")))))
 
 (define-preprocessor-rule identifier ()
   (list :identifier (text (cons (v identifier-nondigit)
