@@ -129,6 +129,9 @@
       character-constant
       string-literal
       punctuator
+      whitespace-token
+      newline-token
+      comment
       ;; this is really the fallback option -- should be the last one
       nw-char))
 
@@ -409,6 +412,15 @@
 
 (define-preprocessor-rule enumeration-constant ()
   (list :enum (cadr (v identifier))))
+
+(define-preprocessor-rule whitespace-token ()
+  (postimes (|| #\space #\tab))
+  '(:whitespace))
+
+(define-preprocessor-rule newline-token ()
+  #\newline (? #\return)
+  '(:newline))
+
 
 ;;; Expressions
 ;;; From here on, it may be required to actually go from ESRAP-LIQUID to
