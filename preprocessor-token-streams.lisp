@@ -150,6 +150,15 @@
       universal-character-name
       implementation-defined-char))
 
+(defun dehexify-char (&rest hex-quads)
+  (let ((it (parse-integer (apply #'concatenate 'string hex-quads) :radix 16)))
+    (cond ((< it #x00A0)
+	   (when (not (find it '(#x0024 #x0040 #x0060) :test #'equal))
+	     (fail-parse "Chars with codes below #x00A0 (except '$', '@' and '`') cannot be hex-encoded")))
+	  ((and (<= #xD800 it) (<= it #xDFFF))
+	   (fail-parse "Chars with codes below in the range #xD800 -- #xDFFF cannot be hex-encoded")))
+    (code-char it)))
+
 (define-preprocessor-rule universal-character-name ()
   (|| (progn (v "\\u") (dehexify-char (v hex-quad)))
       (progn (v "\\U") (dehexify-char (v hex-quad) (v hex-quad)))))

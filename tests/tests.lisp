@@ -19,3 +19,5 @@
 (test basic
   (is (equal '(:identifier "asdf") (preprocessor-parse 'identifier "asdf"))))
 
+(test universal-character-name
+  (is (equal #\$ (preprocessor-parse 'universal-character-name "\\u0024"))))
