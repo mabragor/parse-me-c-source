@@ -21,3 +21,12 @@
 
 (test universal-character-name
   (is (equal #\$ (preprocessor-parse 'universal-character-name "\\u0024"))))
+
+(test integer-constant
+  (is (equal '(:integer-constant 100 nil) (preprocessor-parse 'integer-constant "100")))
+  (is (equal '(:integer-constant 9 nil) (preprocessor-parse 'integer-constant "011")))
+  (is (equal '(:integer-constant 65535 nil) (preprocessor-parse 'integer-constant "0xFFFF")))
+  (is (equal '(:integer-constant 100 (nil :long)) (preprocessor-parse 'integer-constant "100l")))
+  (is (equal '(:integer-constant 9 (nil :long-long)) (preprocessor-parse 'integer-constant "011ll")))
+  (is (equal '(:integer-constant 65535 (:unsigned :long)) (preprocessor-parse 'integer-constant "0xFFFFul")))
+  )

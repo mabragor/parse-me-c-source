@@ -173,6 +173,12 @@
 (define-preprocessor-rule digit ()
   (character-ranges (#\0 #\9)))
 
+(define-preprocessor-rule nonzero-digit ()
+  (character-ranges (#\1 #\9)))
+
+(define-preprocessor-rule octal-digit ()
+  (character-ranges (#\0 #\7)))
+
 (define-preprocessor-rule hexadecimal-digit ()
   (character-ranges (#\0 #\9) (#\a #\f) (#\A #\F)))
 
@@ -297,3 +303,49 @@
 	
 
 ;; TODO : implicitly have identifier '__func__' inside symbol table when translating a function
+
+(define-preprocessor-rule constant ()
+  (|| integer-constant
+      floating-constant
+      enumeration-constant
+      character-constant))
+
+(define-preprocessor-rule integer-constant ()
+  (list :integer-constant (most-full-parse decimal-constant
+					   octal-constant
+					   hexadecimal-constant)
+	(? integer-suffix)))
+
+(define-preprocessor-rule decimal-constant ()
+  (parse-integer (text (v nonzero-digit) (times digit)) :radix 10))
+
+(define-preprocessor-rule octal-constant ()
+  (parse-integer (text (v #\0) (times octal-digit)) :radix 8))
+
+(define-preprocessor-rule hexadecimal-constant ()
+  (v hexadecimal-prefix)
+  (parse-integer (text (postimes hexadecimal-digit)) :radix 16))
+
+(define-preprocessor-rule hexadecimal-prefix ()
+  (|| "0x" "0X"))
+
+(define-preprocessor-rule long-suffix ()
+  (|| #\l #\L) :long)
+
+(define-preprocessor-rule long-long-suffix ()
+  (|| "ll" "LL") :long-long)
+
+(define-preprocessor-rule unsigned-suffix ()
+  (|| #\u #\U) :unsigned)
+
+(defun swap-order (lst)
+  "Swaps order of elements of a list, assuming it has presicely two elements"
+  (list (cadr lst) (car lst)))
+
+(define-preprocessor-rule integer-suffix ()
+  (most-full-parse (list-v unsigned-suffix (? long-suffix))
+		   (list-v unsigned-suffix (? long-long-suffix))
+		   (swap-order (list-v long-suffix (? unsigned-suffix)))
+		   (swap-order (list-v long-long-suffix (? unsigned-suffix)))))
+
+
