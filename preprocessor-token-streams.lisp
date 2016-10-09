@@ -245,8 +245,10 @@
       (!! (|| #\" #\\ #\newline))))
 
 (define-preprocessor-rule header-name ()
-  (|| (progm #\< h-char-sequence #\>)
-      (progm #\" q-char-sequence #\")))
+  (list :header-name (text (|| (progm #\< h-char-sequence #\>)
+			       (progm #\" q-char-sequence #\")))))
+
+;; TODO : only recognize header names in the context of #include and #pragma
 
 (define-preprocessor-rule h-char-sequence ()
   (postimes h-char))
@@ -267,13 +269,13 @@
   (let* ((first (|| digit
 		    (list (v #\.) (v digit))))
 	 (rest (times (|| digit
-			  identifier-nondigit
 			  #\.
 			  (list (v #\e) (v sign))
 			  (list (v #\E) (v sign))
 			  (list (v #\p) (v sign))
-			  (list (v #\P) (v sign))))))
-    (list :pp-number (cons first rest))))
+			  (list (v #\P) (v sign))
+			  identifier-nondigit))))
+    (list :pp-number (text (cons first rest)))))
 	   
 (define-preprocessor-rule comment ()
   (|| one-line-comment

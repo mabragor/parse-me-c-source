@@ -57,3 +57,12 @@
   (is (equal '(:punctuator "[") (preprocessor-parse 'punctuator "[")))
   (is (equal '(:punctuator "[") (preprocessor-parse 'punctuator "<:")))
   )
+
+(test header-name
+  (is (equal '(:header-name "1/a.h") (preprocessor-parse 'header-name "<1/a.h>"))))
+
+(test pp-number
+  (is (equal '(:pp-number "123") (preprocessor-parse 'pp-number "123")))
+  (is (equal '(:pp-number "12.3") (preprocessor-parse 'pp-number "12.3")))
+  (is (equal '(:pp-number "12.3E-02") (preprocessor-parse 'pp-number "12.3E-02")))
+  )
