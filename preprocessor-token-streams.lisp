@@ -287,6 +287,4 @@
 	(list :keyword it))))
 	
 
-
-
-    
+;; TODO : implicitly have identifier '__func__' inside symbol table when translating a function
