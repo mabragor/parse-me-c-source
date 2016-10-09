@@ -261,3 +261,32 @@
   (v "/*")
   (times (!! "*/"))
   (v "*/"))
+
+(defun expand-keyword-specs (lst)
+  (mapcar (lambda (elt)
+	    (if (atom elt)
+		(cons (string-downcase elt) (intern (string elt) "KEYWORD"))
+		(cons (car elt) (cadr elt))))
+	  lst))
+
+(defparameter *known-keywords*
+  (expand-keyword-specs '(auto break case char const continue default do double else enum
+			  extern float for goto if inline int long register restrict return
+			  short signed sizeof static struct switch typedef union unsigned
+			  void volatile while
+			  ("_Alignas" :align-as) ("_Alignof" :align-of) ("_Atomic" :atomic)
+			  ("_Bool" :bool) ("_Complex" :complex) ("_Generic" :generic)
+			  ("_Imaginary" :imaginary) ("_Noreturn" :noreturn) ("_Static_assert" :static-assert)
+			  ("_Thread_local" :thread-local))))
+
+(defun upgrade-to-keyword (identifier)
+  (when (not (eq :identifier (car identifier)))
+    (error "Identifier token expected when upgrading to a keyword"))
+  (let ((it (cdr (assoc (cadr identifier) *known-keywords* :test #'string=))))
+    (if it
+	(list :keyword it))))
+	
+
+
+
+    
