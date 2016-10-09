@@ -6,7 +6,7 @@
 ;; Iterator protocol would be Pythonic one -- with StopIteration and so on
 ;; I require rather fine-grained control over iterator state -- simple co-routine wouldn't do (I guess)
 
-(defgeneric next-val (iterator))
+;; (defgeneric next-iter (iterator))
 (defgeneric peek-val (iterator))
 
 (defclass raw-char-iterator ()
@@ -39,17 +39,16 @@
   (with-slots (stream) iter
     (peek-char nil stream nil)))
 
-(defun mk-raw-char-iter (fname-or-stream)
-  (if (typep fname-or-stream 'stream)
-      (make-instance 'raw-char-iterator :stream fname-or-stream)
-      (with-open-file (stream fname-or-stream)
-	(make-instance 'raw-char-iterator :stream stream :fname fname-or-stream))))
+(defun mk-raw-char-iter (obj)
+  (cond ((typep obj 'stream) (make-instance 'raw-char-iterator :stream obj))
+	((typep obj 'string) (make-instance 'raw-char-iterator :stream (make-string-input-stream obj)))
+	(t (error "Unexpected OBJ type: ~a" (type-of obj)))))
 
 (defun read-char! (stream)
   (handler-case (read-char stream)
     (end-of-file () (error 'stop-iteration))))
 
-(defmethod next-val ((iter raw-char-iterator))
+(defmethod next-iter ((iter raw-char-iterator))
   (with-slots (line-num pos-in-line stream) iter
     (let ((char (read-char! stream)))
       (cond ((char= #\newline char) (progn (incf line-num)
@@ -71,10 +70,10 @@
 (defun mk-trigraph-resolved-iterator (sub-iter)
   (make-instance 'trigraph-resolved-iterator :sub-iter sub-iter))
 
-(defmethod next-val ((iter trigraph-resolved-iterator))
+(defmethod next-iter ((iter trigraph-resolved-iterator))
   ;; TODO : actually resolve trigraphs -- for now this layer does nothing
   (with-slots (sub-iter) iter
-    (next-val sub-iter)))
+    (next-iter sub-iter)))
 
 (defclass escaped-newlines-resolved-iterator (feeding-iterator)
   ((stashed-char :initform nil)))
@@ -82,32 +81,36 @@
 (defun mk-escaped-newlines-resolved-iterator (sub-iter)
   (make-instance 'escaped-newlines-resolved-iterator :sub-iter sub-iter))
 
-(defmethod next-val ((iter escaped-newlines-resolved-iterator))
+(defmethod next-iter ((iter escaped-newlines-resolved-iterator))
   (with-slots (sub-iter) iter
-    (let ((char (next-val sub-iter)))
+    (let ((char (next-iter sub-iter)))
       (if (char= #\\ char)
 	  (let ((it (peek-val sub-iter)))
 	    (if (and it (char= #\newline it))
-		(progn (next-val sub-iter) ; we clear this newline
-		       (next-val iter)) ; we recurse onto the next line
+		(progn (next-iter sub-iter) ; we clear this newline
+		       (next-iter iter)) ; we recurse onto the next line
 		char))
 	  char))))
 
+(defun mk-resolved-iterator (obj)
+  (mk-escaped-newlines-resolved-iterator
+   (mk-trigraph-resolved-iterator
+    (mk-raw-char-iter obj))))
 
 ;; (let ((trigraph-map '((#\= . #\#) (#\( . #\[) (#\/ . #\\) (#\) . #\]) (#\' . #\^)
 ;; 		      (#\< . #\{) (#\! . #\|) (#\> . #\}) (#\- . #\~))))
-;;   (defmethod next-val ((iter trigraph-resolved-iterator))
+;;   (defmethod next-iter ((iter trigraph-resolved-iterator))
 ;;     (with-slots (sub-iter stashed-char) iter
 ;;       (let ((char (or stashed-char
-;; 		      (next-val sub-iter))))
+;; 		      (next-iter sub-iter))))
 ;; 	(if (not (char= #\? char))
 ;; 	    (progn (setf stashed-char nil)
 ;; 		   char)
-;; 	    (progn (let ((next-char (setf stashed-char (handler-case (next-val sub-iter)
+;; 	    (progn (let ((next-char (setf stashed-char (handler-case (next-iter sub-iter)
 ;; 							 (stop-iteration () nil)))))
 ;; 		     (if (not (and next-char (char= #\? char)))
 ;; 			 #\? ; next char is correctly stashed for the next call
-;; 			 (let ((next-next-char (handler-case (next-val sub-iter)
+;; 			 (let ((next-next-char (handler-case (next-iter sub-iter)
 ;; 						 (stop-iteration () nil))))
 ;; 			   (let ((it (and next-next-char (cdr (assoc next-next-char trigraph-map
 ;; 								     :test #'char=)))))
@@ -406,3 +409,19 @@
 
 (define-preprocessor-rule enumeration-constant ()
   (list :enum (cadr (v identifier))))
+
+;;; Expressions
+;;; From here on, it may be required to actually go from ESRAP-LIQUID to
+;;; another parser -- but we'll see later
+;;; Yes, apparently, this part happens already after the upgrade
+;;; OK, first I'll write it as a part of ESRAP-LIQUID parser, and then upgrade.
+
+(define-preprocessor-rule primary-expression ()
+  (|| ;; TODO : error on undefined identifiers
+   identifier
+   constant
+   string-literal
+   (progm '(:punctuator "(") expression '(:punctuator ")"))
+   generic-selection))
+      
+;; (define-preprocessor-rule 

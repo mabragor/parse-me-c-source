@@ -66,3 +66,7 @@
   (is (equal '(:pp-number "12.3") (preprocessor-parse 'pp-number "12.3")))
   (is (equal '(:pp-number "12.3E-02") (preprocessor-parse 'pp-number "12.3E-02")))
   )
+
+(test resolving-escaped-newlines
+  (is (equal '(:identifier "asdf") (preprocessor-parse-token-iter 'identifier (mk-resolved-iterator "as\\
+df")))))
