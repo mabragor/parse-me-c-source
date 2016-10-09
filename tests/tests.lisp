@@ -39,3 +39,16 @@
   (is (equal '(:floating-constant (("1" "23") nil) :long-double) (preprocessor-parse 'floating-constant "1.23L")))
   )
 	     
+(test enumeration-constant
+  (is (equal '(:enum "asdf") (preprocessor-parse 'enumeration-constant "asdf")))
+  )
+
+(test character-constant
+  (is (equal '(:char-const nil (#\Nul)) (preprocessor-parse 'character-constant "'\\0'")))
+  )
+
+(test string-literal
+  (is (equal '(:string-literal nil "3") (preprocessor-parse 'string-literal "\"3\"")))
+  (is (equal `(:string-literal nil ,(format nil "~a" (code-char #x12)))
+	     (preprocessor-parse 'string-literal "\"\\x12\"")))
+  )

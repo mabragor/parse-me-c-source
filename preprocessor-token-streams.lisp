@@ -150,18 +150,22 @@
       universal-character-name
       implementation-defined-char))
 
-(defun dehexify-char (&rest hex-quads)
-  (let ((it (parse-integer (apply #'concatenate 'string hex-quads) :radix 16)))
-    (cond ((< it #x00A0)
-	   (when (not (find it '(#x0024 #x0040 #x0060) :test #'equal))
-	     (fail-parse "Chars with codes below #x00A0 (except '$', '@' and '`') cannot be hex-encoded")))
-	  ((and (<= #xD800 it) (<= it #xDFFF))
-	   (fail-parse "Chars with codes below in the range #xD800 -- #xDFFF cannot be hex-encoded")))
+(defun decode-char (things radix &key guard)
+  (let ((it (parse-integer (apply #'text things) :radix radix)))
+    (if guard
+	(funcall guard it))
     (code-char it)))
 
+(defun universal-char-name-guard (code)
+  (cond ((< code #x00A0)
+	 (when (not (find code '(#x0024 #x0040 #x0060) :test #'equal))
+	   (fail-parse "Chars with codes below #x00A0 (except '$', '@' and '`') cannot be hex-encoded")))
+	((and (<= #xD800 code) (<= code #xDFFF))
+	 (fail-parse "Chars with codes below in the range #xD800 -- #xDFFF cannot be hex-encoded"))))
+
 (define-preprocessor-rule universal-character-name ()
-  (|| (progn (v "\\u") (dehexify-char (v hex-quad)))
-      (progn (v "\\U") (dehexify-char (v hex-quad) (v hex-quad)))))
+  (|| (progn (v "\\u") (decode-char (v hex-quad) 16 :guard #'universal-char-name-guard))
+      (progn (v "\\U") (decode-char (list-v hex-quad hex-quad) 16 :guard #'universal-char-name-guard))))
 
 (define-preprocessor-rule hex-quad ()
   (times hexadecimal-digit :exactly 4))
@@ -213,17 +217,17 @@
 
 (define-preprocessor-rule octal-escape-sequence ()
   (v #\\)
-  (apply #'deoctify-char (times octal-digit :from 1 :upto 3)))
+  (decode-char (times octal-digit :from 1 :upto 3) 8))
 
 (define-preprocessor-rule hexadecimal-escape-sequence ()
   (v "\\x")
-  (apply #'dehexify-char (postimes hexadecimal-digit)))
+  (decode-char (postimes hexadecimal-digit) 16))
 
 
 (define-preprocessor-rule string-literal ()
   (let* ((prefix (? (most-full-parse "u8" "u" "U" "L")))
 	 (body (progm #\" (? s-char-sequence) #\")))
-    (list :string-literal prefix body)))
+    (list :string-literal prefix (text body))))
 
 (define-preprocessor-rule s-char-sequence ()
   (postimes s-char))
@@ -389,3 +393,6 @@
   (v hexadecimal-prefix)
   (|| (list-v hexadecimal-fractional-constant binary-exponent-part)
       (list-v hexadecimal-digit-sequence binary-exponent-part)))
+
+(define-preprocessor-rule enumeration-constant ()
+  (list :enum (cadr (v identifier))))
