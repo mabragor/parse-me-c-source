@@ -36,12 +36,8 @@
 					   
 
 (defiter token-iter (preprocessor-token-iter)
-  (iter (while t)
-	(handler-case (let ((it (funcall preprocessor-token-iter)))
-			(yield it))
-	  (esrap-liquid::stop-iteration ()
-	    (terminate)))))
-      
+  (iter (generate it in-it (wrap-preprocessor-token-iter preprocessor-token-iter))
+	(yield (next it))))
 
 ;;; #if #ifdef #ifndef and friends
 
