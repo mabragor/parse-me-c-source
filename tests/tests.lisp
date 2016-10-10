@@ -70,3 +70,14 @@
 (test resolving-escaped-newlines
   (is (equal '(:identifier "asdf") (preprocessor-parse-token-iter 'identifier (mk-resolved-iterator "as\\
 df")))))
+
+(test preprocessor-lexer
+  (let ((lex (parse-me-c-source::mk-preprocessor-lexer "#define foo")))
+    (is (equal '((:PUNCTUATOR "#")
+		 (:IDENTIFIER "define")
+		 (:WHITESPACE)
+		 (:IDENTIFIER "foo"))
+	       (iter (for it next (handler-case (funcall lex)
+				    (esrap-liquid::stop-iteration ()
+				      (terminate))))
+		     (collect it))))))

@@ -44,6 +44,12 @@
 	((typep obj 'string) (make-instance 'raw-char-iterator :stream (make-string-input-stream obj)))
 	(t (error "Unexpected OBJ type: ~a" (type-of obj)))))
 
+(defun mk-preprocessor-lexer (obj)
+  ;; KLUDGE : I need to more accurately analyze for iterator depletion in ESRAP-LIQUID
+  ;;        : But for now simply ignoring the issue (via junk-allowed) will do
+  (mk-preprocessor-tokenizer 'preprocessing-token (esrap-liquid::mk-cache-iter (mk-raw-char-iter obj))
+			     :junk-allowed t))
+
 (defun read-char! (stream)
   (handler-case (read-char stream)
     (end-of-file () (error 'stop-iteration))))
@@ -134,6 +140,9 @@
       comment
       ;; this is really the fallback option -- should be the last one
       nw-char))
+
+(define-preprocessor-rule nw-char ()
+  (!! whitespace-token))
 
 (defparameter *punctuator-coercion*
   '(("<:" . "[") (":>" . "]") ("<%" . "{") ("%>" . "}") ("%:" . "#") ("%:%:" . "##")))
@@ -418,7 +427,7 @@
   '(:whitespace))
 
 (define-preprocessor-rule newline-token ()
-  #\newline (? #\return)
+  (v #\newline) (? #\return)
   '(:newline))
 
 
