@@ -142,7 +142,7 @@
       nw-char))
 
 (define-preprocessor-rule nw-char ()
-  (!! whitespace-token))
+  (list :nw-char (!! whitespace-token)))
 
 (defparameter *punctuator-coercion*
   '(("<:" . "[") (":>" . "]") ("<%" . "{") ("%>" . "}") ("%:" . "#") ("%:%:" . "##")))

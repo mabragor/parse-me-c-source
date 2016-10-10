@@ -15,6 +15,7 @@
   :components ((:file "package")
 	       (:file "preprocessor-macros")
 	       (:file "preprocessor-token-streams")
+	       (:file "preprocessor-parser")
                (:file "parse-me-c-source")))
 
 
