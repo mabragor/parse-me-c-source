@@ -301,3 +301,10 @@
 		      (progn (drop-butlast-cache *iterator-stack*)
 			     (yield it)))))))))
 
+;; The structure of the C preprocessor is trickier than that of my
+;; NAIVE-MACRO-PREPROCESSOR in several aspects:
+;; * the preprocessor commands are analyzed only in the raw pretoken stream,
+;;   not in the macroexpanded stream -- it is not possible to write a macro,
+;;   that expands into # define, say.
+;; * however, the bodies of some preprocessor commands are taken from
+;;   macroexpanded stream (computed include and the condition of # if are examples)
