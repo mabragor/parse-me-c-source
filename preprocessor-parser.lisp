@@ -110,10 +110,14 @@
   ((cache :initform nil)))
 
 (defmethod cl-itertools::i-coro :around ((obj caching-iterator-stack))
-  (with-slots (cache) obj
-    (let ((it (call-next-method)))
-      (push it cache)
-      it)))
+  (lambda (x)
+    (declare (ignore x))
+    (with-slots (cache) obj
+      (let ((vals (multiple-value-list (funcall (call-next-method) nil))))
+	(if (not vals)
+	    (values)
+	    (progn (push (car vals) cache)
+		   (car vals)))))))
 
 (defun last-elt (obj)
   (with-slots (cache) obj
@@ -163,16 +167,40 @@
   (iter (for it in-it (cl-ppcre:split " " str))
 	(yield it)))
 
-(defiter naive-macro-preprocessor (token-iter)
-  (let ((the-stack (make-instance 'caching-iterator-stack)))
-    (push-stack token-iter the-stack)
-    (iter (for it in-it the-stack)
-	  (yield it))))
-
-(defun mk-iterator-stack (iter)
-  (let ((it (make-instance 'iterator-stack)))
+(defun %mk-iterator-stack (iter class)
+  (let ((it (make-instance class)))
     (push-stack iter it)
     it))
-  
+
+(defun mk-iterator-stack (iter)
+  (%mk-iterator-stack iter 'iterator-stack))
+(defun mk-cached-iterator-stack (iter)
+  (%mk-iterator-stack iter 'caching-iterator-stack))
+
+(defun base-mode-escape-handler (iterator-stack)
+  (handler-case (let ((it (inext-or-error iterator-stack)))
+		  (format t "~a" it))
+    (stop-iteration () :stop-iteration)
+    (:no-error (&rest args) (declare (ignore args)) :yield)))
+
+(defparameter *base-mode-special-operators*
+  ;; The idea is to write handling of special operators in such a way, that they are not hardcoded
+  ;; (in contrast with how it's done in the standard Lisp reader
+  `(("escape" . ,#'base-mode-escape-handler)
+    ))
+
+(defiter naive-macro-preprocessor (token-iter)
+  (let ((iterator-stack (mk-cached-iterator-stack token-iter)))
+    (iter (for it in-it iterator-stack)
+	  (let ((handler (cdr (assoc it *base-mode-special-operators* :test #'equal))))
+	    (if handler
+		(case (funcall handler iterator-stack)
+		  (:stop-iteration (terminate))
+		  (:yield (yield (last-elt iterator-stack)))
+		  (otherwise nil))
+		(yield it))))))
+
+
+
 
   
