@@ -52,7 +52,7 @@
 
 (defun read-char! (stream)
   (handler-case (read-char stream)
-    (end-of-file () (error 'stop-iteration))))
+    (end-of-file () (error 'esrap-liquid::stop-iteration))))
 
 (defmethod next-iter ((iter raw-char-iterator))
   (with-slots (line-num pos-in-line stream) iter

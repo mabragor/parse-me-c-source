@@ -87,3 +87,9 @@ df")))))
 	       (:IDENTIFIER "foo"))
 	     (parse-me-c-source::collect-iter (parse-me-c-source::wrap-preprocessor-token-iter
 			    (parse-me-c-source::mk-preprocessor-lexer "#define foo"))))))
+
+(test mk-iterator-stack
+  (is (equal '("a" "b" "c") (parse-me-c-source::collect-iter
+			     (parse-me-c-source::mk-iterator-stack
+			      (parse-me-c-source::simple-word-iter "a b c")))))
+  )
