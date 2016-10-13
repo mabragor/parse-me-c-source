@@ -198,35 +198,37 @@
     (push-stack iter it)
     it))
 
+(defparameter *macros* nil)
+(defparameter *iterator-stack* nil)
+
 (defun mk-iterator-stack (iter)
   (%mk-iterator-stack iter 'iterator-stack))
 (defun mk-cached-iterator-stack (iter)
   (%mk-iterator-stack iter 'caching-iterator-stack))
 
-(defun base-mode-escape-handler (iterator-stack &optional macros)
-  (declare (ignore macros))
+(defun base-mode-escape-handler ()
   ;; The goal here is to make this handler usable not only in base mode, but also in
   ;; the mode of parsing the macro body
-  (handler-case (progn (pop-cache iterator-stack)
-		       (inext-or-error iterator-stack)
+  (handler-case (progn (pop-cache *iterator-stack*)
+		       (inext-or-error *iterator-stack*)
 		       :yield)
     (stop-iteration () :stop-iteration)))
 
-(defun get-macro-name (iterator-stack token)
-  (pop-cache iterator-stack)
-  (handler-case (let ((it (inext-or-error iterator-stack)))
-		  (drop-cache iterator-stack)
+(defun get-macro-name (token)
+  (pop-cache *iterator-stack*)
+  (handler-case (let ((it (inext-or-error *iterator-stack*)))
+		  (drop-cache *iterator-stack*)
 		  it)
     (stop-iteration () (error "'~a' token found as the last token of the stream" token))))
 
-(defun base-mode-undefine-handler (iterator-stack &optional macros)
-  (let ((macro-name (get-macro-name iterator-stack "undefined")))
-    (setf (gethash macro-name macros) nil)
+(defun base-mode-undefine-handler ()
+  (let ((macro-name (get-macro-name "undefined")))
+    (setf (gethash macro-name *macros*) nil)
     nil))
 
-(defun macro-body-mode-stop-handler (iterator-stack)
-  (let ((ans (split-butlast-cache-as-list iterator-stack)))
-    (with-slots (cache) iterator-stack
+(defun macro-body-mode-stop-handler ()
+  (let ((ans (split-butlast-cache-as-list *iterator-stack*)))
+    (with-slots (cache) *iterator-stack*
       (push ans cache)
       :return)))
 
@@ -234,20 +236,21 @@
   `(("escape" . ,#'base-mode-escape-handler) ; yes, we want to reuse this handler also here
     ("stop" . ,#'macro-body-mode-stop-handler)))
 
-(defun get-macro-body (iterator-stack)
-  (with-new-cache iterator-stack
-    (iter (for token in-it iterator-stack)
+(defun get-macro-body ()
+  (with-new-cache *iterator-stack*
+    (iter (for token in-it *iterator-stack*)
 	  (let ((handler (cdr (assoc token *macro-body-mode-special-operators* :test #'equal))))
 	    (if handler
-		(case (funcall handler iterator-stack)
+		(case (funcall handler)
 		  (:stop-iteration (terminate))
-		  (:return (return (last-elt iterator-stack)))
+		  ;; Yes, we return the macro body via the stack
+		  (:return (return (last-elt *iterator-stack*)))
 		  (otherwise nil))))
 	  (finally (error "Token stream ended while scanning macro body (missing 'stop' token?)")))))
 		 
-(defun base-mode-define-handler (iterator-stack macros)
-  (setf (gethash (get-macro-name iterator-stack "defined") macros)
-	(get-macro-body iterator-stack))
+(defun base-mode-define-handler ()
+  (setf (gethash (get-macro-name "defined") *macros*)
+	(get-macro-body))
   nil)
 
 (defparameter *base-mode-special-operators*
@@ -258,24 +261,35 @@
     ("define" . ,#'base-mode-define-handler)
     ))
 
-(defun install-macroexpansion (iterator-stack macros macro-name)
-  (push-stack (mk-iter (gethash macro-name macros)) iterator-stack))
+(defun install-macroexpansion (macro-name)
+  (push-stack (mk-iter (gethash macro-name *macros*)) *iterator-stack*))
+
+(defparameter *macro-call-stack* nil)
+
+(defun active-macro-p (macro-name)
+  (and (gethash macro-name *macros*)
+       (not (find macro-name *macro-call-stack* :test #'equal))))
 
 (defiter naive-macro-preprocessor (token-iter)
   ;; We cannot use special variables due to current limitations of CL-COROUTINE
   ;; That's why we pass ITERATOR-STACK and MACROS around
   (let ((iterator-stack (mk-cached-iterator-stack token-iter))
-	(macros (make-hash-table :test #'equal)))
+	(macros (make-hash-table :test #'equal))
+	(macro-call-stack nil))
     (iter (for it in-it iterator-stack)
-	  (let ((handler (cdr (assoc it *base-mode-special-operators* :test #'equal))))
-	    (if handler
-		(case (funcall handler iterator-stack macros)
-		  (:stop-iteration (terminate))
-		  (:yield (drop-butlast-cache iterator-stack)
-			  (yield (last-elt iterator-stack)))
-		  (otherwise nil))
-		(if (not (gethash it macros))
-		    (progn (drop-butlast-cache iterator-stack)
-			   (yield it))
-		    (install-macroexpansion iterator-stack macros it)))))))
+	  (let ((*iterator-stack* iterator-stack)
+		(*macros* macros)
+		(*macro-call-stack* macro-call-stack))
+	    ;; (format t "*iterator-stack*: ~a *macros*: ~a~%" *iterator-stack* *macros*)
+	    (let ((handler (cdr (assoc it *base-mode-special-operators* :test #'equal))))
+	      (if handler
+		  (case (funcall handler)
+		    (:stop-iteration (terminate))
+		    (:yield (drop-butlast-cache *iterator-stack*)
+			    (yield (last-elt *iterator-stack*)))
+		    (otherwise nil))
+		  (if (active-macro-p it)
+		      (install-macroexpansion it)
+		      (progn (drop-butlast-cache *iterator-stack*)
+			     (yield it)))))))))
 
