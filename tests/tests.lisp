@@ -95,8 +95,11 @@ df")))))
   )
 
 (test naive-preprocessor
-  (is (equal '("a" "b" "c") (parse-me-c-source::collect-iter
-			     (parse-me-c-source::naive-macro-preprocessor
-			      (parse-me-c-source::simple-word-iter "a escape b c escape")))))
-  )
+  (macrolet ((frob (x y)
+	       `(is (equal ,x (parse-me-c-source::collect-iter
+			       (parse-me-c-source::naive-macro-preprocessor
+				(parse-me-c-source::simple-word-iter ,y)))))))
+    (frob '("a" "b" "c") "a escape b c escape")
+    (frob '("a" "b" "b" "b" "a" "a" "a") "a define a b stop a a a undefine a a a a")
+    ))
   

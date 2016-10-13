@@ -127,6 +127,11 @@
   (with-slots (cache) obj
     (setf cache nil)))
 
+(defun drop-butlast-cache (obj)
+  (with-slots (cache) obj
+    (if cache
+	(setf (cdr cache) nil))))
+
 (defun split-cache-as-list (obj)
   (with-slots (cache) obj
     (let ((it (nreverse cache)))
@@ -139,6 +144,10 @@
       (drop-cache obj)
       it)))
   
+(defun search-for-token (obj token)
+  (iter (for it in-it obj)
+	(if (equal token it)
+	    (terminate))))
 
 ;; OK, let's do a very naive preprocessor with macros that do not accept parameters at all
 ;; Tokens -- words
@@ -177,27 +186,54 @@
 (defun mk-cached-iterator-stack (iter)
   (%mk-iterator-stack iter 'caching-iterator-stack))
 
-(defun base-mode-escape-handler (iterator-stack)
-  (handler-case (inext-or-error iterator-stack)
-    (stop-iteration () :stop-iteration)
-    (:no-error (&rest args) (declare (ignore args)) :yield)))
+(defun base-mode-escape-handler (iterator-stack macros)
+  (declare (ignore macros))
+  (handler-case (progn (inext-or-error iterator-stack)
+		       (drop-butlast-cache iterator-stack)
+		       :yield)
+    (stop-iteration () :stop-iteration)))
+
+(defun base-mode-undefine-handler (iterator-stack macros)
+  (handler-case (let ((it (inext-or-error iterator-stack)))
+		  (setf (gethash it macros) nil)
+		  (drop-cache iterator-stack)
+		  nil)
+    (stop-iteration () (error "'undefined' token found as the last token of the stream"))))
+
+(defun base-mode-define-handler (iterator-stack macros)
+  (handler-case (let ((it (inext-or-error iterator-stack)))
+		  (drop-cache iterator-stack)
+		  (search-for-token iterator-stack "stop") ; this way I will miss all the escapes
+		  (setf (gethash it macros) (split-butlast-cache-as-list iterator-stack))
+		  nil)
+    (stop-iteration () (error "'defined' token found as the last token of the stream or expansion is not STOP terminated"))))
 
 (defparameter *base-mode-special-operators*
   ;; The idea is to write handling of special operators in such a way, that they are not hardcoded
   ;; (in contrast with how it's done in the standard Lisp reader
   `(("escape" . ,#'base-mode-escape-handler)
+    ("undefine" . ,#'base-mode-undefine-handler)
+    ("define" . ,#'base-mode-define-handler)
     ))
 
+(defun install-macroexpansion (iterator-stack macros macro-name)
+  (push-stack (mk-iter (gethash macro-name macros)) iterator-stack))
+
 (defiter naive-macro-preprocessor (token-iter)
-  (let ((iterator-stack (mk-cached-iterator-stack token-iter)))
+  ;; We cannot use special variables due to current limitations of CL-COROUTINE
+  ;; That's why we pass ITERATOR-STACK and MACROS around
+  (let ((iterator-stack (mk-cached-iterator-stack token-iter))
+	(macros (make-hash-table :test #'equal)))
     (iter (for it in-it iterator-stack)
 	  (let ((handler (cdr (assoc it *base-mode-special-operators* :test #'equal))))
 	    (if handler
-		(case (funcall handler iterator-stack)
+		(case (funcall handler iterator-stack macros)
 		  (:stop-iteration (terminate))
 		  (:yield (yield (last-elt iterator-stack)))
 		  (otherwise nil))
-		(yield it))))))
+		(if (not (gethash it macros))
+		    (yield it)
+		    (install-macroexpansion iterator-stack macros it)))))))
 
 
 
