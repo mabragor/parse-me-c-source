@@ -67,3 +67,9 @@
 ;;;;     (iter (while t)
 ;;;; 	  (setf the-special-variable (not the-special-variable))
 ;;;; 	  (yield the-special-variable))))
+
+(defclass iterator-stack (cl-itertools::iterator)
+  ())
+
+(defmethod cl-itertools::i-coro ((obj iterator-stack))
+  (lambda (x) 3))
