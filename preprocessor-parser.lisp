@@ -200,6 +200,7 @@
 
 (defparameter *macros* nil)
 (defparameter *iterator-stack* nil)
+(defparameter *active-macro-calls* nil)
 
 (defun mk-iterator-stack (iter)
   (%mk-iterator-stack iter 'iterator-stack))
@@ -261,25 +262,32 @@
     ("define" . ,#'base-mode-define-handler)
     ))
 
-(defun install-macroexpansion (macro-name)
-  (push-stack (mk-iter (gethash macro-name *macros*)) *iterator-stack*))
 
-(defparameter *macro-call-stack* nil)
+(defun install-macroexpansion (macro-name)
+  (let ((iter (mk-iter (gethash macro-name *macros*))))
+    (setf (gethash macro-name *active-macro-calls*) t)
+    (push-stack iter *iterator-stack*
+		;; Closure is needed here, because the cleanup will be called outside
+		;; the LET, that sets the special variables -- in the iterate driver clause
+		(let ((active-macro-calls *active-macro-calls*))
+		  (lambda ()
+		    ;; (format t "In macro cleanup: ~a ~a" macro-name active-macro-calls)
+		    (setf (gethash macro-name active-macro-calls) nil))))))
 
 (defun active-macro-p (macro-name)
   (and (gethash macro-name *macros*)
-       (not (find macro-name *macro-call-stack* :test #'equal))))
+       (not (gethash macro-name *active-macro-calls*))))
 
 (defiter naive-macro-preprocessor (token-iter)
   ;; We cannot use special variables due to current limitations of CL-COROUTINE
   ;; That's why we pass ITERATOR-STACK and MACROS around
   (let ((iterator-stack (mk-cached-iterator-stack token-iter))
 	(macros (make-hash-table :test #'equal))
-	(macro-call-stack nil))
+	(active-macro-calls (make-hash-table :test #'equal)))
     (iter (for it in-it iterator-stack)
 	  (let ((*iterator-stack* iterator-stack)
 		(*macros* macros)
-		(*macro-call-stack* macro-call-stack))
+		(*active-macro-calls* active-macro-calls))
 	    ;; (format t "*iterator-stack*: ~a *macros*: ~a~%" *iterator-stack* *macros*)
 	    (let ((handler (cdr (assoc it *base-mode-special-operators* :test #'equal))))
 	      (if handler

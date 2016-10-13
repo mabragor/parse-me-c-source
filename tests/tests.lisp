@@ -102,5 +102,8 @@ df")))))
     (frob '("a" "b" "c") "a escape b c escape")
     (frob '("a" "b" "b" "b" "a" "a" "a") "a define a b stop a a a undefine a a a a")
     (frob '("a" "b" "stop" "b" "stop" "b" "stop") "a define a b escape stop stop a a a")
+    ;; test active macro calls
+    (frob '("a" "b" "a") "a define a b a stop a")
+    (frob '("c" "d" "a" "d" "c" "b") "define a c b stop define b d a stop a b")
     ))
   
