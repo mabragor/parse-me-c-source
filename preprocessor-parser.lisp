@@ -123,6 +123,23 @@
   (with-slots (cache) obj
     (car cache)))
 
+(defun pop-cache (obj)
+  (with-slots (cache) obj
+    (pop cache)))
+
+(defun push-cache (thing obj)
+  (with-slots (cache) obj
+    (push thing cache)))
+
+(defmacro with-new-cache (obj-var &body body)
+  (let ((g!-old-cache (gensym "G!-OLD-CACHE"))
+	(g!-cache (gensym "G!-CACHE")))
+    `(with-slots ((,g!-old-cache cache)) ,obj-var
+       (let ((,g!-cache ,g!-old-cache))
+	 (unwind-protect (progn (setf ,g!-old-cache nil)
+				,@body)
+	   (setf ,g!-old-cache ,g!-cache))))))
+
 (defun drop-cache (obj)
   (with-slots (cache) obj
     (setf cache nil)))
@@ -186,27 +203,52 @@
 (defun mk-cached-iterator-stack (iter)
   (%mk-iterator-stack iter 'caching-iterator-stack))
 
-(defun base-mode-escape-handler (iterator-stack macros)
+(defun base-mode-escape-handler (iterator-stack &optional macros)
   (declare (ignore macros))
-  (handler-case (progn (inext-or-error iterator-stack)
-		       (drop-butlast-cache iterator-stack)
+  ;; The goal here is to make this handler usable not only in base mode, but also in
+  ;; the mode of parsing the macro body
+  (handler-case (progn (pop-cache iterator-stack)
+		       (inext-or-error iterator-stack)
 		       :yield)
     (stop-iteration () :stop-iteration)))
 
-(defun base-mode-undefine-handler (iterator-stack macros)
+(defun get-macro-name (iterator-stack token)
+  (pop-cache iterator-stack)
   (handler-case (let ((it (inext-or-error iterator-stack)))
-		  (setf (gethash it macros) nil)
 		  (drop-cache iterator-stack)
-		  nil)
-    (stop-iteration () (error "'undefined' token found as the last token of the stream"))))
+		  it)
+    (stop-iteration () (error "'~a' token found as the last token of the stream" token))))
 
+(defun base-mode-undefine-handler (iterator-stack &optional macros)
+  (let ((macro-name (get-macro-name iterator-stack "undefined")))
+    (setf (gethash macro-name macros) nil)
+    nil))
+
+(defun macro-body-mode-stop-handler (iterator-stack)
+  (let ((ans (split-butlast-cache-as-list iterator-stack)))
+    (with-slots (cache) iterator-stack
+      (push ans cache)
+      :return)))
+
+(defparameter *macro-body-mode-special-operators*
+  `(("escape" . ,#'base-mode-escape-handler) ; yes, we want to reuse this handler also here
+    ("stop" . ,#'macro-body-mode-stop-handler)))
+
+(defun get-macro-body (iterator-stack)
+  (with-new-cache iterator-stack
+    (iter (for token in-it iterator-stack)
+	  (let ((handler (cdr (assoc token *macro-body-mode-special-operators* :test #'equal))))
+	    (if handler
+		(case (funcall handler iterator-stack)
+		  (:stop-iteration (terminate))
+		  (:return (return (last-elt iterator-stack)))
+		  (otherwise nil))))
+	  (finally (error "Token stream ended while scanning macro body (missing 'stop' token?)")))))
+		 
 (defun base-mode-define-handler (iterator-stack macros)
-  (handler-case (let ((it (inext-or-error iterator-stack)))
-		  (drop-cache iterator-stack)
-		  (search-for-token iterator-stack "stop") ; this way I will miss all the escapes
-		  (setf (gethash it macros) (split-butlast-cache-as-list iterator-stack))
-		  nil)
-    (stop-iteration () (error "'defined' token found as the last token of the stream or expansion is not STOP terminated"))))
+  (setf (gethash (get-macro-name iterator-stack "defined") macros)
+	(get-macro-body iterator-stack))
+  nil)
 
 (defparameter *base-mode-special-operators*
   ;; The idea is to write handling of special operators in such a way, that they are not hardcoded
@@ -229,13 +271,11 @@
 	    (if handler
 		(case (funcall handler iterator-stack macros)
 		  (:stop-iteration (terminate))
-		  (:yield (yield (last-elt iterator-stack)))
+		  (:yield (drop-butlast-cache iterator-stack)
+			  (yield (last-elt iterator-stack)))
 		  (otherwise nil))
 		(if (not (gethash it macros))
-		    (yield it)
+		    (progn (drop-butlast-cache iterator-stack)
+			   (yield it))
 		    (install-macroexpansion iterator-stack macros it)))))))
 
-
-
-
-  

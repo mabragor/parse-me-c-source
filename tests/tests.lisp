@@ -101,5 +101,6 @@ df")))))
 				(parse-me-c-source::simple-word-iter ,y)))))))
     (frob '("a" "b" "c") "a escape b c escape")
     (frob '("a" "b" "b" "b" "a" "a" "a") "a define a b stop a a a undefine a a a a")
+    (frob '("a" "b" "stop" "b" "stop" "b" "stop") "a define a b escape stop stop a a a")
     ))
   
