@@ -178,8 +178,7 @@
   (%mk-iterator-stack iter 'caching-iterator-stack))
 
 (defun base-mode-escape-handler (iterator-stack)
-  (handler-case (let ((it (inext-or-error iterator-stack)))
-		  (format t "~a" it))
+  (handler-case (inext-or-error iterator-stack)
     (stop-iteration () :stop-iteration)
     (:no-error (&rest args) (declare (ignore args)) :yield)))
 

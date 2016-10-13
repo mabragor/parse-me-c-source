@@ -93,3 +93,10 @@ df")))))
 			     (parse-me-c-source::mk-iterator-stack
 			      (parse-me-c-source::simple-word-iter "a b c")))))
   )
+
+(test naive-preprocessor
+  (is (equal '("a" "b" "c") (parse-me-c-source::collect-iter
+			     (parse-me-c-source::naive-macro-preprocessor
+			      (parse-me-c-source::simple-word-iter "a escape b c escape")))))
+  )
+  
